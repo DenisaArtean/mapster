@@ -5,6 +5,7 @@ using System.Runtime.Serialization;
 using CommandLine;
 using Mapster.Common;
 using Mapster.Common.MemoryMappedTypes;
+using Mapster.Rendering;
 using OSMDataParser;
 using OSMDataParser.Elements;
 
@@ -151,6 +152,7 @@ public static class Program
                 }
                 featureData.GeometryType = (byte)geometryType;
 
+
                 totalPropertyCount += featureData.PropertyKeys.keys.Count;
                 totalCoordinateCount += featureData.Coordinates.coordinates.Count;
 
@@ -159,6 +161,7 @@ public static class Program
                     throw new InvalidDataContractException("Property keys and values should have the same count");
                 }
 
+                featureData.RenderType = (byte)VerifRendType(featureData);
                 featuresData.Add(way.Id, featureData);
             }
 
@@ -187,7 +190,7 @@ public static class Program
                     throw new InvalidDataContractException("Property keys and values should have the same count");
                 }
 
-                featuresData.Add(nodeId, new FeatureData
+                var featureData = new FeatureData
                 {
                     Id = nodeId,
                     GeometryType = (byte)GeometryType.Point,
@@ -197,7 +200,9 @@ public static class Program
                     }),
                     PropertyKeys = (totalPropertyCount, featurePropKeys),
                     PropertyValues = (totalPropertyCount, featurePropValues)
-                });
+                };
+                featureData.RenderType = (byte)VerifRendType(featureData);
+                featuresData.Add(nodeId, featureData);
 
                 totalPropertyCount += featurePropKeys.Count;
                 ++totalCoordinateCount;
@@ -233,6 +238,7 @@ public static class Program
 
                 fileWriter.Write(featureIds[i]); // MapFeature: Id
                 fileWriter.Write(labels[i]); // MapFeature: LabelOffset
+                fileWriter.Write(featureData.RenderType);
                 fileWriter.Write(featureData.GeometryType); // MapFeature: GeometryType
                 fileWriter.Write(featureData.Coordinates.offset); // MapFeature: CoordinateOffset
                 fileWriter.Write(featureData.Coordinates.coordinates.Count); // MapFeature: CoordinateCount
@@ -357,13 +363,110 @@ public static class Program
         public ImmutableArray<Way> Ways { get; init; }
     }
 
-    private struct FeatureData
+    public struct FeatureData
     {
         public long Id { get; init; }
 
         public byte GeometryType { get; set; }
+        public byte RenderType { get; set; }
         public (int offset, List<Coordinate> coordinates) Coordinates { get; init; }
         public (int offset, List<string> keys) PropertyKeys { get; init; }
         public (int offset, List<string> values) PropertyValues { get; init; }
     }
+
+    public static RenderType VerifRendType(FeatureData featureData)
+    {
+        var featureType = (GeometryType) featureData.GeometryType;
+
+        var renderType = (RenderType) featureData.RenderType;
+        if (featureData.PropertyKeys.keys.Any(key => key == "highway") && MapFeature.HighwayTypes.Any(v => featureData.PropertyValues.values.Any(p => p.StartsWith(v))))
+        {
+            renderType = RenderType.ROAD;
+        }
+        else if (featureData.PropertyKeys.keys.Any(key => key == "water") && (GeometryType)featureData.GeometryType != GeometryType.Point)
+        {
+            renderType = RenderType.WATERWAY;
+        }
+        else if ( (featureData.PropertyKeys.keys.Any(key => key.StartsWith("boundary") && featureData.PropertyValues.values.Any(v => v.StartsWith("administrative"))))
+                    || (featureData.PropertyKeys.keys.Any(key => key.StartsWith("admin_level") && featureData.PropertyValues.values.Any(v => v == "2"))) ) 
+        {
+            renderType = RenderType.BORDER;
+        }
+        else if ( featureData.PropertyKeys.keys.Any(key => key.StartsWith("place")) && ( featureData.PropertyValues.values.Any(v => v.StartsWith("city")) ||
+                                                                                         featureData.PropertyValues.values.Any(v => v.StartsWith("town")) ||
+                                                                                         featureData.PropertyValues.values.Any(v => v.StartsWith("locality")) ||
+                                                                                         featureData.PropertyValues.values.Any(v => v.StartsWith("hamlet")) ))
+        {
+            renderType = RenderType.POPULATED_PLACE;
+        }
+        else if (featureData.PropertyKeys.keys.Any(key => key.StartsWith("railway")))
+        {
+            renderType = RenderType.RAILWAY;
+        }
+        else if (featureData.PropertyKeys.keys.Any(key => key.StartsWith("natural")) && featureType == GeometryType.Polygon)
+        {
+            renderType = RenderType.GEOFEATURE;
+        }
+        else if (featureData.PropertyKeys.keys.Any(key => key.StartsWith("boundary")) && featureData.PropertyValues.values.Any(v => v.StartsWith("forest")) )
+        {
+            renderType = RenderType.FOREST;
+        }
+        else if (featureData.PropertyKeys.keys.Any(key => key.StartsWith("landuse")) && (featureData.PropertyValues.values.Any(v => v.StartsWith("forest"))
+                                                                                            || featureData.PropertyValues.values.Any(v => v.StartsWith("orchard"))) )
+        {
+            renderType = RenderType.FOREST;
+        }
+        else if (featureType == GeometryType.Polygon && ( featureData.PropertyKeys.keys.Any(key => key.StartsWith("landuse"))
+                                                    && (featureData.PropertyValues.values.Any(v => v.StartsWith("residential")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("cemetery")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("industrial")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("comercial")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("square")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("construction")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("military")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("quarry")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("brownfield")) ) ) )
+        {
+            renderType = RenderType.RESIDENTIAL;
+        }
+        else if (featureType == GeometryType.Polygon && (featureData.PropertyKeys.keys.Any(key => key.StartsWith("landuse"))
+                                                     && (featureData.PropertyValues.values.Any(v => v.StartsWith("farm")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("meadow")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("grass")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("greenfield")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("recreation_ground")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("winter_sports")) ||
+                                                        featureData.PropertyValues.values.Any(v => v.StartsWith("allotments")) ) ) )
+        {
+            renderType = RenderType.PLAIN;
+        }
+        else if (featureType == GeometryType.Polygon &&
+                ( featureData.PropertyKeys.keys.Any(key => key.StartsWith("landuse")) && (featureData.PropertyValues.values.Any(v => v.StartsWith("reservoir")) ||
+                                                                                          featureData.PropertyValues.values.Any(v => v.StartsWith("basin"))) ) )
+        {
+            renderType = RenderType.WATER;
+        }
+        else if (featureType == GeometryType.Polygon && featureData.PropertyValues.values.Any(v => v.StartsWith("building")))
+        {
+            renderType = RenderType.RESIDENTIAL;
+        }
+        else if (featureType == GeometryType.Polygon && featureData.PropertyValues.values.Any(v => v.StartsWith("leisure")))
+        {
+            renderType = RenderType.RESIDENTIAL;
+        }
+        else if (featureType == GeometryType.Polygon && featureData.PropertyValues.values.Any(v => v.StartsWith("amenity")))
+        {
+            renderType = RenderType.RESIDENTIAL;
+        }
+
+        return renderType;
+    }
+}
+
+public struct BoundingBox
+{
+    public float MinX;
+    public float MaxX;
+    public float MinY;
+    public float MaxY;
 }

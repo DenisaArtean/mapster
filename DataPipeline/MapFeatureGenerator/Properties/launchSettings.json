@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "MapFeatureGenerator": {
+      "commandName": "Project",
+      "commandLineArgs": "-i  \"C:\\Users\\40762\\Desktop\\Mapster\\Tests\\TestOSMDataReader\\MapData\\andorra-10032022.osm.pbf\" -o \"C:\\Users\\40762\\Desktop\\Mapster\\andorra.bin\""
+    }
+  }
+}

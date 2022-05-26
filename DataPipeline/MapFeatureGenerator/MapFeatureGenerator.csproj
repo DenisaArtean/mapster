@@ -11,6 +11,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\..\Common\Common.csproj" />
+      <ProjectReference Include="..\..\Rendering\TileRenderer\TileRenderer.csproj" />
       <ProjectReference Include="..\OSMDataParser\OSMDataParser.csproj" />
     </ItemGroup>
 

@@ -125,8 +125,28 @@ public struct MapFeature
     [FieldOffset(0)] public long Id;
     [FieldOffset(8)] public int LabelOffset;
     [FieldOffset(12)] public GeometryType GeometryType;
-    [FieldOffset(13)] public int CoordinateOffset;
-    [FieldOffset(17)] public int CoordinateCount;
-    [FieldOffset(21)] public int PropertiesOffset;
-    [FieldOffset(25)] public int PropertyCount;
+    [FieldOffset(13)] public RenderType RenderType;
+    [FieldOffset(14)] public int CoordinateOffset;
+    [FieldOffset(18)] public int CoordinateCount;
+    [FieldOffset(22)] public int PropertiesOffset;
+    [FieldOffset(26)] public int PropertyCount;
+}
+
+public enum RenderType
+{
+    ROAD,
+    RAILWAY,
+    WATERWAY,
+    POPULATED_PLACE,
+    BORDER,
+    GEOFEATURE,
+    RESIDENTIAL,
+    PLAIN,
+    FOREST,
+    DESERT,
+    UNKNOWN,
+    WATER,
+    MOUNTAINS,
+    HILLS
+
 }

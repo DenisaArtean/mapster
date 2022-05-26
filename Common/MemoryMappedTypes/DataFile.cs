@@ -25,6 +25,7 @@ public readonly ref struct MapFeatureData
     public ReadOnlySpan<char> Label { get; init; }
     public ReadOnlySpan<Coordinate> Coordinates { get; init; }
     public Dictionary<string, string> Properties { get; init; }
+    public RenderType RType { get; init; }
 }
 
 /// <summary>
@@ -194,7 +195,8 @@ public unsafe class DataFile : IDisposable
                             Label = label,
                             Coordinates = coordinates,
                             Type = feature->GeometryType,
-                            Properties = properties
+                            Properties = properties,
+                            RType = feature->RenderType
                         }))
                     {
                         break;
